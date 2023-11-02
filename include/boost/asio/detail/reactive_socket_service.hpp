@@ -243,20 +243,31 @@ public:
         ConstBufferSequence> bufs_type;
 
     size_t n;
-    if (bufs_type::is_single_buffer)
-    {
-      n = socket_ops::sync_sendto1(impl.socket_, impl.state_,
-          bufs_type::first(buffers).data(),
-          bufs_type::first(buffers).size(), flags,
-          destination.data(), destination.size(), ec);
-    }
-    else
-    {
       bufs_type bufs(buffers);
       n = socket_ops::sync_sendto(impl.socket_, impl.state_,
           bufs.buffers(), bufs.count(), flags,
           destination.data(), destination.size(), ec);
-    }
+
+    BOOST_ASIO_ERROR_LOCATION(ec);
+    return n;
+  }
+
+  // Send a datagram to the specified endpoint. Returns the number of bytes
+  // sent.
+  template <typename ConstBufferSequence>
+  size_t homa_send_to(implementation_type& impl, const ConstBufferSequence& buffers,
+      const endpoint_type& destination, socket_base::message_flags flags,
+                      uint64_t *id, uint64_t completion_cookie
+                      , boost::system::error_code& ec)
+  {
+    typedef buffer_sequence_adapter<boost::asio::const_buffer,
+        ConstBufferSequence> bufs_type;
+
+    size_t n;
+      bufs_type bufs(buffers);
+      n = socket_ops::homa_sync_sendto(impl.socket_, impl.state_,
+          bufs.buffers(), bufs.count(), flags,
+          destination.data(), destination.size(), id, completion_cookie, ec);
 
     BOOST_ASIO_ERROR_LOCATION(ec);
     return n;
@@ -352,6 +363,7 @@ public:
   size_t receive_from(implementation_type& impl,
       const MutableBufferSequence& buffers,
       endpoint_type& sender_endpoint, socket_base::message_flags flags,
+                      //                      uint64_t *id, uint64_t completion_cookie,
       boost::system::error_code& ec)
   {
     typedef buffer_sequence_adapter<boost::asio::mutable_buffer,
@@ -359,18 +371,9 @@ public:
 
     std::size_t addr_len = sender_endpoint.capacity();
     std::size_t n;
-    if (bufs_type::is_single_buffer)
-    {
-      n = socket_ops::sync_recvfrom1(impl.socket_, impl.state_,
-          bufs_type::first(buffers).data(), bufs_type::first(buffers).size(),
-          flags, sender_endpoint.data(), &addr_len, ec);
-    }
-    else
-    {
       bufs_type bufs(buffers);
-      n = socket_ops::sync_recvfrom(impl.socket_, impl.state_, bufs.buffers(),
+      n = socket_ops::homa_sync_recvfrom(impl.socket_, impl.state_, bufs.buffers(),
           bufs.count(), flags, sender_endpoint.data(), &addr_len, ec);
-    }
 
     if (!ec)
       sender_endpoint.resize(addr_len);
