@@ -134,6 +134,17 @@ public:
     return ec;
   }
 
+  template <typename MutableBufferSequence>
+  void set_buffers(implementation_type& impl, const MutableBufferSequence& buffers,
+                   boost::system::error_code& ec) {
+    typedef buffer_sequence_adapter<boost::asio::mutable_buffer,
+        MutableBufferSequence> bufs_type;
+
+    socket_ops::homa_set_buffer(impl.socket_,
+                                                bufs_type::first(buffers).data(), bufs_type::first(buffers).size(), ec);
+    boost::asio::detail::throw_error(ec, "set_buffers");
+  }
+
   // Assign a native socket to a socket implementation.
   boost::system::error_code assign(implementation_type& impl,
       const protocol_type& protocol, const native_handle_type& native_socket,
@@ -252,10 +263,22 @@ public:
     return n;
   }
 
+  // Wait until data can be sent without blocking.
+  size_t send_to(implementation_type& impl, const null_buffers&,
+      const endpoint_type&, socket_base::message_flags,
+      boost::system::error_code& ec)
+  {
+    // Wait for socket to become ready.
+    socket_ops::poll_write(impl.socket_, impl.state_, -1, ec);
+
+    BOOST_ASIO_ERROR_LOCATION(ec);
+    return 0;
+  }
+
   // Send a datagram to the specified endpoint. Returns the number of bytes
   // sent.
   template <typename ConstBufferSequence>
-  size_t homa_send_to(implementation_type& impl, const ConstBufferSequence& buffers,
+  size_t homa_send_to(base_implementation_type& impl, const ConstBufferSequence& buffers,
       const endpoint_type& destination, socket_base::message_flags flags,
                       uint64_t *id, uint64_t completion_cookie
                       , boost::system::error_code& ec)
@@ -271,18 +294,6 @@ public:
 
     BOOST_ASIO_ERROR_LOCATION(ec);
     return n;
-  }
-
-  // Wait until data can be sent without blocking.
-  size_t send_to(implementation_type& impl, const null_buffers&,
-      const endpoint_type&, socket_base::message_flags,
-      boost::system::error_code& ec)
-  {
-    // Wait for socket to become ready.
-    socket_ops::poll_write(impl.socket_, impl.state_, -1, ec);
-
-    BOOST_ASIO_ERROR_LOCATION(ec);
-    return 0;
   }
 
   // Start an asynchronous send. The data being sent must be valid for the
@@ -359,21 +370,16 @@ public:
 
   // Receive a datagram with the endpoint of the sender. Returns the number of
   // bytes received.
-  template <typename MutableBufferSequence>
   size_t receive_from(implementation_type& impl,
-      const MutableBufferSequence& buffers,
+      buffer_offset offset,
       endpoint_type& sender_endpoint, socket_base::message_flags flags,
-                      //                      uint64_t *id, uint64_t completion_cookie,
+                      uint64_t id, uint64_t completion_cookie,
       boost::system::error_code& ec)
   {
-    typedef buffer_sequence_adapter<boost::asio::mutable_buffer,
-        MutableBufferSequence> bufs_type;
-
     std::size_t addr_len = sender_endpoint.capacity();
     std::size_t n;
-      bufs_type bufs(buffers);
-      n = socket_ops::homa_sync_recvfrom(impl.socket_, impl.state_, bufs.buffers(),
-          bufs.count(), flags, sender_endpoint.data(), &addr_len, ec);
+    n = socket_ops::homa_sync_recvfrom(impl.socket_, impl.state_, offset
+                                       , flags, sender_endpoint.data(), &addr_len, id, ec);
 
     if (!ec)
       sender_endpoint.resize(addr_len);

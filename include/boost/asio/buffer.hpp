@@ -2179,6 +2179,36 @@ private:
   const std::size_t max_size_;
 };
 
+/** @defgroup buffer_offset boost::asio::buffer_offset
+ *
+ */
+class buffer_offset
+{
+public:
+  buffer_offset() noexcept
+    : offset_(0u)
+  {
+  }
+
+  
+  buffer_offset(std::size_t off, std::size_t size) noexcept
+    : offset_(off)
+    , size_(size)
+  {
+  }
+
+  std::size_t offset() const { return offset_; }
+  std::size_t size() const { return size_; }
+  
+private:
+  std::size_t offset_;
+  std::size_t size_;
+};
+
+template <typename MutableBufferSequence>
+boost::asio::mutable_buffer
+operator+(const MutableBufferSequence& buffers, buffer_offset off);
+
 /** @defgroup dynamic_buffer boost::asio::dynamic_buffer
  *
  * @brief The boost::asio::dynamic_buffer function is used to create a

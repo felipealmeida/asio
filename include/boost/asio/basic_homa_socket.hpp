@@ -340,6 +340,19 @@ public:
   {
   }
 
+  /**
+   *
+   *
+   */
+  template <typename MutableBufferSequence>
+  void set_buffers(const MutableBufferSequence& buffers) {
+    boost::system::error_code ec;
+    this->impl_.get_service().set_buffers(
+        this->impl_.get_implementation(), buffers, ec);
+    boost::asio::detail::throw_error(ec, "receive");
+  }
+
+
   /// Send some data on a connected socket.
   /**
    * This function is used to send data on the homa socket. The function
@@ -1021,13 +1034,13 @@ public:
    * multiple buffers in one go, and how to use it with arrays, boost::array or
    * std::vector.
    */
-  template <typename MutableBufferSequence>
-  std::size_t receive_from(const MutableBufferSequence& buffers,
-      endpoint_type& sender_endpoint)
+  std::size_t receive_from(buffer_offset offset,
+      endpoint_type& sender_endpoint
+                           , uint64_t id, uint64_t completion_cookie)
   {
     boost::system::error_code ec;
     std::size_t s = this->impl_.get_service().receive_from(
-        this->impl_.get_implementation(), buffers, sender_endpoint, 0, ec);
+                                                           this->impl_.get_implementation(), offset, sender_endpoint, 0, id, completion_cookie, ec);
     boost::asio::detail::throw_error(ec, "receive_from");
     return s;
   }

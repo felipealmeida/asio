@@ -296,6 +296,23 @@ int bind(socket_type s, const void* addr,
   return result;
 }
 
+
+void homa_set_buffer(socket_type s, void* data, size_t length, boost::system::error_code& ec) {
+  
+  //  abort();
+    struct homa_set_buf_args {
+      void *start;
+      size_t length;
+    }  args;
+    args.start = data;
+    args.length = length;
+    const unsigned so_homa_set_buf = 10;
+    auto status = ::setsockopt(s, 0xFD, so_homa_set_buf, &args,
+                               sizeof(args));
+    get_last_error(ec, status < 0);
+    fprintf(stderr, "setsockopt buffer status: %d\n", (int)status);
+}
+
 int close(socket_type s, state_type& state,
     bool destruction, boost::system::error_code& ec)
 {
@@ -1054,9 +1071,10 @@ signed_size_type recvfrom(socket_type s, buf* bufs, size_t count,
 #endif // defined(BOOST_ASIO_WINDOWS) || defined(__CYGWIN__)
 }
 
-signed_size_type homa_recvfrom(socket_type s, buf* bufs, size_t count,
-    int flags, void* addr, std::size_t* addrlen, boost::system::error_code& ec)
+signed_size_type homa_recvfrom(socket_type s, buffer_offset offset,
+                               int flags, void* addr, std::size_t* addrlen, uint64_t id, boost::system::error_code& ec)
 {
+    fprintf(stderr, "homa recvfrom\n");
 struct homa_recvmsg_args {
 
 	/**
@@ -1118,8 +1136,10 @@ static_assert(sizeof(struct homa_recvmsg_args) >= 120,
 static_assert(sizeof(struct homa_recvmsg_args) <= 120,
 		"homa_recvmsg_args grew");
  std::memset(&args, 0, sizeof(args));
- args.num_bpages = 0;
-
+ args.id = id;
+ args.num_bpages = 2;
+ args.flags = 1;
+ args.bpage_offsets[0] = offset.offset();
 
   msghdr msg = msghdr();
   init_msghdr_msg_name(msg.msg_name, addr);
@@ -1128,7 +1148,10 @@ static_assert(sizeof(struct homa_recvmsg_args) <= 120,
   msg.msg_iovlen = /*static_cast<int>(count)*/ 0;
   msg.msg_control = &args;
   msg.msg_controllen = sizeof(args);
+  fprintf(stderr, "called recvmsg\n");
   signed_size_type result = ::recvmsg(s, &msg, flags);
+  fprintf(stderr, "recvmsg result: %d num_pages: %d offset: %d\n", (int)result, (int)args.num_bpages, (int)args.bpage_offsets[0]);
+  //fprintf(stderr, "%c%c%c%c%c%c\n", 
   get_last_error(ec, result < 0);
   *addrlen = msg.msg_namelen;
   return result;
@@ -1211,8 +1234,8 @@ size_t sync_recvfrom(socket_type s, state_type state, buf* bufs, size_t count,
   }
 }
 
-size_t homa_sync_recvfrom(socket_type s, state_type state, buf* bufs, size_t count,
-    int flags, void* addr, std::size_t* addrlen, boost::system::error_code& ec)
+size_t homa_sync_recvfrom(socket_type s, state_type state, buffer_offset offset,
+                          int flags, void* addr, std::size_t* addrlen, uint64_t id, boost::system::error_code& ec)
 {
   if (s == invalid_socket)
   {
@@ -1225,7 +1248,7 @@ size_t homa_sync_recvfrom(socket_type s, state_type state, buf* bufs, size_t cou
   {
     // Try to complete the operation without blocking.
     signed_size_type bytes = socket_ops::homa_recvfrom(
-        s, bufs, count, flags, addr, addrlen, ec);
+                                                       s, offset, flags, addr, addrlen, id, ec);
 
     // Check if operation succeeded.
     if (bytes >= 0)
@@ -1748,10 +1771,13 @@ signed_size_type homa_sendto(socket_type s, const buf* bufs,
                            , uint64_t *id, uint64_t completion_cookie
                            , boost::system::error_code& ec)
 {
+  fprintf(stderr, "homa sendto\n");
+  //uint64_t newid = 0;
+  //id = &newid;
   struct homa_sendmsg_args {
     uint64_t id;
     uint64_t completion_cookie;
-  } args {0, completion_cookie};
+  } args {0, /*completion_cookie*/0};
   msghdr msg = msghdr();
   init_msghdr_msg_name(msg.msg_name, addr);
   msg.msg_namelen = static_cast<int>(addrlen);
@@ -1763,6 +1789,10 @@ signed_size_type homa_sendto(socket_type s, const buf* bufs,
   flags |= MSG_NOSIGNAL;
 #endif // defined(BOOST_ASIO_HAS_MSG_NOSIGNAL)
   signed_size_type result = ::sendmsg(s, &msg, flags);
+  fprintf(stderr, "homa sendto return: %d\n", (int)result);
+  fprintf(stderr, "homa sendto with id: %d\n", (int)args.id);
+  assert(!!id);
+  *id = args.id;
   get_last_error(ec, result < 0);
   return result;
 }

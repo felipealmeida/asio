@@ -827,6 +827,19 @@ private:
 };
 
 } // namespace detail
+
+template <typename MutableBufferSequence>
+boost::asio::mutable_buffer
+operator+(const MutableBufferSequence& buffers, buffer_offset off)
+{
+  typedef detail::buffer_sequence_adapter<boost::asio::mutable_buffer,
+        MutableBufferSequence> bufs_type;
+
+  return {static_cast<unsigned char*>(bufs_type::first(buffers).data()) + off.offset(),
+          std::min(bufs_type::first(buffers).size(), off.size())};
+    
+}
+
 } // namespace asio
 } // namespace boost
 
