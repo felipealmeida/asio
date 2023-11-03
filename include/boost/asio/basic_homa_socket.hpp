@@ -29,6 +29,22 @@
 namespace boost {
 namespace asio {
 
+class request_id {
+public:
+  request_id() : id_(0) {}
+  request_id(std::uint64_t id) : id_(id) {}
+
+  std::uint64_t& id() noexcept { return id_; }
+  std::uint64_t id() const noexcept { return id_; }
+  void set_id(std::uint64_t id) { id_ = id; }
+private:
+  std::uint64_t id_;
+
+  friend std::ostream& operator<<(std::ostream& os, request_id id) {
+    return os << id.id();
+  }
+};
+
 #if !defined(BOOST_ASIO_BASIC_HOMA_SOCKET_FWD_DECL)
 #define BOOST_ASIO_BASIC_HOMA_SOCKET_FWD_DECL
 
@@ -593,16 +609,58 @@ public:
    * std::vector.
    */
   template <typename ConstBufferSequence>
-  std::size_t send_to(const ConstBufferSequence& buffers,
-      const endpoint_type& destination
-                      , uint64_t *id, uint64_t completion_cookie)
+  std::size_t send_request_to(const ConstBufferSequence& buffers,
+                              const endpoint_type& destination,
+                              request_id& id, uint64_t completion_cookie)
   {
     boost::system::error_code ec;
-    std::size_t s = this->impl_.get_service().homa_send_to(
-                                                      this->impl_.get_implementation(), buffers, destination, 0, id, completion_cookie, ec);
-    boost::asio::detail::throw_error(ec, "send_to");
+    std::size_t s = this->impl_.get_service().send_homa_message_to
+      (
+       this->impl_.get_implementation(), buffers, destination, 0, id.id(), completion_cookie, ec
+       );
+    boost::asio::detail::throw_error(ec, "HOMA::send_request_to");
     return s;
   }
+
+  /// Send a homa to the specified endpoint.
+  /**
+   * This function is used to send a homa to the specified remote endpoint.
+   * The function call will block until the data has been sent successfully or
+   * an error occurs.
+   *
+   * @param buffers One or more data buffers to be sent to the remote endpoint.
+   *
+   * @param destination The remote endpoint to which the data will be sent.
+   *
+   * @returns The number of bytes sent.
+   *
+   * @throws boost::system::system_error Thrown on failure.
+   *
+   * @par Example
+   * To send a single data buffer use the @ref buffer function as follows:
+   * @code
+   * boost::asio::ip::udp::endpoint destination(
+   *     boost::asio::ip::address::from_string("1.2.3.4"), 12345);
+   * socket.send_to(boost::asio::buffer(data, size), destination);
+   * @endcode
+   * See the @ref buffer documentation for information on sending multiple
+   * buffers in one go, and how to use it with arrays, boost::array or
+   * std::vector.
+   */
+  template <typename ConstBufferSequence>
+  std::size_t send_reply_to(const ConstBufferSequence& buffers,
+                            const endpoint_type& destination,
+                            request_id id, uint64_t completion_cookie)
+  {
+    boost::system::error_code ec;
+    std::size_t s = this->impl_.get_service().send_homa_message_to
+      (
+       this->impl_.get_implementation(), buffers, destination, 0, id.id(), completion_cookie, ec
+       );
+    boost::asio::detail::throw_error(ec, "HOMA::send_reply_to");
+    return s;
+  }
+
 
   /// Send a homa to the specified endpoint.
   /**
@@ -814,15 +872,15 @@ public:
    * multiple buffers in one go, and how to use it with arrays, boost::array or
    * std::vector.
    */
-  template <typename MutableBufferSequence>
-  std::size_t receive(const MutableBufferSequence& buffers)
-  {
-    boost::system::error_code ec;
-    std::size_t s = this->impl_.get_service().receive(
-        this->impl_.get_implementation(), buffers, 0, ec);
-    boost::asio::detail::throw_error(ec, "receive");
-    return s;
-  }
+  // template <typename MutableBufferSequence>
+  // std::size_t receive(const MutableBufferSequence& buffers)
+  // {
+  //   boost::system::error_code ec;
+  //   std::size_t s = this->impl_.get_service().receive(
+  //       this->impl_.get_implementation(), buffers, 0, ec);
+  //   boost::asio::detail::throw_error(ec, "receive");
+  //   return s;
+  // }
 
   /// Receive some data on a connected socket.
   /**
@@ -842,16 +900,16 @@ public:
    * the receive_from function to receive data on an unconnected homa
    * socket.
    */
-  template <typename MutableBufferSequence>
-  std::size_t receive(const MutableBufferSequence& buffers,
-      socket_base::message_flags flags)
-  {
-    boost::system::error_code ec;
-    std::size_t s = this->impl_.get_service().receive(
-        this->impl_.get_implementation(), buffers, flags, ec);
-    boost::asio::detail::throw_error(ec, "receive");
-    return s;
-  }
+  // template <typename MutableBufferSequence>
+  // std::size_t receive(const MutableBufferSequence& buffers,
+  //     socket_base::message_flags flags)
+  // {
+  //   boost::system::error_code ec;
+  //   std::size_t s = this->impl_.get_service().receive(
+  //       this->impl_.get_implementation(), buffers, flags, ec);
+  //   boost::asio::detail::throw_error(ec, "receive");
+  //   return s;
+  // }
 
   /// Receive some data on a connected socket.
   /**
@@ -871,13 +929,13 @@ public:
    * the receive_from function to receive data on an unconnected homa
    * socket.
    */
-  template <typename MutableBufferSequence>
-  std::size_t receive(const MutableBufferSequence& buffers,
-      socket_base::message_flags flags, boost::system::error_code& ec)
-  {
-    return this->impl_.get_service().receive(
-        this->impl_.get_implementation(), buffers, flags, ec);
-  }
+  // template <typename MutableBufferSequence>
+  // std::size_t receive(const MutableBufferSequence& buffers,
+  //     socket_base::message_flags flags, boost::system::error_code& ec)
+  // {
+  //   return this->impl_.get_service().receive(
+  //       this->impl_.get_implementation(), buffers, flags, ec);
+  // }
 
   /// Start an asynchronous receive on a connected socket.
   /**
@@ -931,22 +989,22 @@ public:
    *
    * @li @c cancellation_type::total
    */
-  template <typename MutableBufferSequence,
-      BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
-        std::size_t)) ReadToken = default_completion_token_t<executor_type>>
-  auto async_receive(const MutableBufferSequence& buffers,
-      ReadToken&& token = default_completion_token_t<executor_type>())
-    -> decltype(
-      async_initiate<ReadToken,
-        void (boost::system::error_code, std::size_t)>(
-          declval<initiate_async_receive>(), token,
-          buffers, socket_base::message_flags(0)))
-  {
-    return async_initiate<ReadToken,
-      void (boost::system::error_code, std::size_t)>(
-        initiate_async_receive(this), token,
-        buffers, socket_base::message_flags(0));
-  }
+  // template <typename MutableBufferSequence,
+  //     BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
+  //       std::size_t)) ReadToken = default_completion_token_t<executor_type>>
+  // auto async_receive(const MutableBufferSequence& buffers,
+  //     ReadToken&& token = default_completion_token_t<executor_type>())
+  //   -> decltype(
+  //     async_initiate<ReadToken,
+  //       void (boost::system::error_code, std::size_t)>(
+  //         declval<initiate_async_receive>(), token,
+  //         buffers, socket_base::message_flags(0)))
+  // {
+  //   return async_initiate<ReadToken,
+  //     void (boost::system::error_code, std::size_t)>(
+  //       initiate_async_receive(this), token,
+  //       buffers, socket_base::message_flags(0));
+  // }
 
   /// Start an asynchronous receive on a connected socket.
   /**
@@ -992,20 +1050,59 @@ public:
    *
    * @li @c cancellation_type::total
    */
-  template <typename MutableBufferSequence,
-      BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
-        std::size_t)) ReadToken = default_completion_token_t<executor_type>>
-  auto async_receive(const MutableBufferSequence& buffers,
-      socket_base::message_flags flags,
-      ReadToken&& token = default_completion_token_t<executor_type>())
-    -> decltype(
-      async_initiate<ReadToken,
-        void (boost::system::error_code, std::size_t)>(
-          declval<initiate_async_receive>(), token, buffers, flags))
+  // template <typename MutableBufferSequence,
+  //     BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
+  //       std::size_t)) ReadToken = default_completion_token_t<executor_type>>
+  // auto async_receive(const MutableBufferSequence& buffers,
+  //     socket_base::message_flags flags,
+  //     ReadToken&& token = default_completion_token_t<executor_type>())
+  //   -> decltype(
+  //     async_initiate<ReadToken,
+  //       void (boost::system::error_code, std::size_t)>(
+  //         declval<initiate_async_receive>(), token, buffers, flags))
+  // {
+  //   return async_initiate<ReadToken,
+  //     void (boost::system::error_code, std::size_t)>(
+  //       initiate_async_receive(this), token, buffers, flags);
+  // }
+
+  /// Receive a homa with the endpoint of the sender.
+  /**
+   * This function is used to receive a homa. The function call will block
+   * until data has been received successfully or an error occurs.
+   *
+   * @param buffers One or more buffers into which the data will be received.
+   *
+   * @param sender_endpoint An endpoint object that receives the endpoint of
+   * the remote sender of the homa.
+   *
+   * @returns The number of bytes received.
+   *
+   * @throws boost::system::system_error Thrown on failure.
+   *
+   * @par Example
+   * To receive into a single data buffer use the @ref buffer function as
+   * follows:
+   * @code
+   * boost::asio::ip::udp::endpoint sender_endpoint;
+   * socket.receive_from(
+   *     boost::asio::buffer(data, size), sender_endpoint);
+   * @endcode
+   * See the @ref buffer documentation for information on receiving into
+   * multiple buffers in one go, and how to use it with arrays, boost::array or
+   * std::vector.
+   */
+  std::size_t receive_request_from(homa_pages& written_pages, endpoint_type& sender_endpoint
+                                   , request_id& id, uint64_t& completion_cookie)
   {
-    return async_initiate<ReadToken,
-      void (boost::system::error_code, std::size_t)>(
-        initiate_async_receive(this), token, buffers, flags);
+    boost::system::error_code ec;
+    id = {};
+    std::size_t s = this->impl_.get_service().receive_homa_message_from
+      (this->impl_.get_implementation(),
+       written_pages,
+       sender_endpoint, 0, id.id(), completion_cookie, asio::detail::homa_ops::homa_recvmsg_request, ec);
+    boost::asio::detail::throw_error(ec, "HOMA::receive_request_from");
+    return s;
   }
 
   /// Receive a homa with the endpoint of the sender.
@@ -1034,14 +1131,15 @@ public:
    * multiple buffers in one go, and how to use it with arrays, boost::array or
    * std::vector.
    */
-  std::size_t receive_from(buffer_offset offset,
-      endpoint_type& sender_endpoint
-                           , uint64_t id, uint64_t completion_cookie)
+  std::size_t receive_reply_from(homa_pages& written_pages, endpoint_type& sender_endpoint
+                                 , request_id id, uint64_t& completion_cookie)
   {
     boost::system::error_code ec;
-    std::size_t s = this->impl_.get_service().receive_from(
-                                                           this->impl_.get_implementation(), offset, sender_endpoint, 0, id, completion_cookie, ec);
-    boost::asio::detail::throw_error(ec, "receive_from");
+    std::size_t s = this->impl_.get_service().receive_homa_message_from
+      (this->impl_.get_implementation(),
+       written_pages,
+       sender_endpoint, 0, id.id(), completion_cookie, asio::detail::homa_ops::homa_recvmsg_response, ec);
+    boost::asio::detail::throw_error(ec, "HOMA::receive_reply_from");
     return s;
   }
   

@@ -37,12 +37,14 @@
 #include <boost/asio/detail/reactor_op.hpp>
 #include <boost/asio/detail/socket_holder.hpp>
 #include <boost/asio/detail/socket_ops.hpp>
+#include <boost/asio/detail/homa_ops.hpp>
 #include <boost/asio/detail/socket_types.hpp>
 
 #include <boost/asio/detail/push_options.hpp>
 
 namespace boost {
 namespace asio {
+
 namespace detail {
 
 template <typename Protocol>
@@ -140,7 +142,7 @@ public:
     typedef buffer_sequence_adapter<boost::asio::mutable_buffer,
         MutableBufferSequence> bufs_type;
 
-    socket_ops::homa_set_buffer(impl.socket_,
+    homa_ops::set_buffer(impl.socket_,
                                                 bufs_type::first(buffers).data(), bufs_type::first(buffers).size(), ec);
     boost::asio::detail::throw_error(ec, "set_buffers");
   }
@@ -243,54 +245,54 @@ public:
     return ec;
   }
 
+  // // Send a datagram to the specified endpoint. Returns the number of bytes
+  // // sent.
+  // template <typename ConstBufferSequence>
+  // size_t send_homa_message_to(implementation_type& impl, const ConstBufferSequence& buffers,
+  //     const endpoint_type& destination, socket_base::message_flags flags,
+  //     boost::system::error_code& ec)
+  // {
+  //   typedef buffer_sequence_adapter<boost::asio::const_buffer,
+  //       ConstBufferSequence> bufs_type;
+
+  //   size_t n;
+  //     bufs_type bufs(buffers);
+  //     n = socket_ops::sync_sendto(impl.socket_, impl.state_,
+  //         bufs.buffers(), bufs.count(), flags,
+  //         destination.data(), destination.size(), ec);
+
+  //   BOOST_ASIO_ERROR_LOCATION(ec);
+  //   return n;
+  // }
+
+  // // Wait until data can be sent without blocking.
+  // size_t send_to(implementation_type& impl, const null_buffers&,
+  //     const endpoint_type&, socket_base::message_flags,
+  //     boost::system::error_code& ec)
+  // {
+  //   // Wait for socket to become ready.
+  //   socket_ops::poll_write(impl.socket_, impl.state_, -1, ec);
+
+  //   BOOST_ASIO_ERROR_LOCATION(ec);
+  //   return 0;
+  // }
+
   // Send a datagram to the specified endpoint. Returns the number of bytes
   // sent.
   template <typename ConstBufferSequence>
-  size_t send_to(implementation_type& impl, const ConstBufferSequence& buffers,
-      const endpoint_type& destination, socket_base::message_flags flags,
-      boost::system::error_code& ec)
+  size_t send_homa_message_to(base_implementation_type& impl, const ConstBufferSequence& buffers,
+                              const endpoint_type& destination, socket_base::message_flags flags,
+                              uint64_t& id, uint64_t completion_cookie,
+                              boost::system::error_code& ec)
   {
     typedef buffer_sequence_adapter<boost::asio::const_buffer,
         ConstBufferSequence> bufs_type;
 
     size_t n;
       bufs_type bufs(buffers);
-      n = socket_ops::sync_sendto(impl.socket_, impl.state_,
-          bufs.buffers(), bufs.count(), flags,
-          destination.data(), destination.size(), ec);
-
-    BOOST_ASIO_ERROR_LOCATION(ec);
-    return n;
-  }
-
-  // Wait until data can be sent without blocking.
-  size_t send_to(implementation_type& impl, const null_buffers&,
-      const endpoint_type&, socket_base::message_flags,
-      boost::system::error_code& ec)
-  {
-    // Wait for socket to become ready.
-    socket_ops::poll_write(impl.socket_, impl.state_, -1, ec);
-
-    BOOST_ASIO_ERROR_LOCATION(ec);
-    return 0;
-  }
-
-  // Send a datagram to the specified endpoint. Returns the number of bytes
-  // sent.
-  template <typename ConstBufferSequence>
-  size_t homa_send_to(base_implementation_type& impl, const ConstBufferSequence& buffers,
-      const endpoint_type& destination, socket_base::message_flags flags,
-                      uint64_t *id, uint64_t completion_cookie
-                      , boost::system::error_code& ec)
-  {
-    typedef buffer_sequence_adapter<boost::asio::const_buffer,
-        ConstBufferSequence> bufs_type;
-
-    size_t n;
-      bufs_type bufs(buffers);
-      n = socket_ops::homa_sync_sendto(impl.socket_, impl.state_,
-          bufs.buffers(), bufs.count(), flags,
-          destination.data(), destination.size(), id, completion_cookie, ec);
+      n = homa_ops::sync_sendto(impl.socket_, impl.state_,
+                                       bufs.buffers(), bufs.count(), flags,
+                                       destination.data(), destination.size(), id, completion_cookie, ec);
 
     BOOST_ASIO_ERROR_LOCATION(ec);
     return n;
@@ -370,16 +372,18 @@ public:
 
   // Receive a datagram with the endpoint of the sender. Returns the number of
   // bytes received.
-  size_t receive_from(implementation_type& impl,
-      buffer_offset offset,
-      endpoint_type& sender_endpoint, socket_base::message_flags flags,
-                      uint64_t id, uint64_t completion_cookie,
-      boost::system::error_code& ec)
+  size_t receive_homa_message_from(implementation_type& impl,
+                                   homa_pages& written_pages,
+                                   endpoint_type& sender_endpoint, socket_base::message_flags flags,
+                                   uint64_t& id, uint64_t& completion_cookie,
+                                   int homa_flags,
+                                   boost::system::error_code& ec)
   {
     std::size_t addr_len = sender_endpoint.capacity();
     std::size_t n;
-    n = socket_ops::homa_sync_recvfrom(impl.socket_, impl.state_, offset
-                                       , flags, sender_endpoint.data(), &addr_len, id, ec);
+    n = homa_ops::sync_recvfrom(impl.socket_, impl.state_, written_pages,
+                                       flags, sender_endpoint.data(), &addr_len, id, completion_cookie,
+                                       homa_flags, ec);
 
     if (!ec)
       sender_endpoint.resize(addr_len);

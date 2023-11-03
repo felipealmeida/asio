@@ -288,42 +288,42 @@ void test()
     // int i9 = socket1.async_send(null_buffers(), in_flags, lazy);
     // (void)i9;
 
-    socket1.send_to(buffer(mutable_char_buffer),
-                    ip::homa::endpoint(ip::homa::v4(), 0), 0, 0);
-    socket1.send_to(buffer(mutable_char_buffer),
-        ip::homa::endpoint(ip::homa::v6(), 0), 0, 0);
-    socket1.send_to(buffer(const_char_buffer),
-        ip::homa::endpoint(ip::homa::v4(), 0), 0, 0);
-    socket1.send_to(buffer(const_char_buffer),
-        ip::homa::endpoint(ip::homa::v6(), 0), 0, 0);
-    socket1.send_to(null_buffers(),
-        ip::homa::endpoint(ip::homa::v4(), 0), 0, 0);
-    socket1.send_to(null_buffers(),
-        ip::homa::endpoint(ip::homa::v6(), 0), 0, 0);
-    socket1.send_to(buffer(mutable_char_buffer),
-        ip::homa::endpoint(ip::homa::v4(), 0), in_flags, 0, 0);
-    socket1.send_to(buffer(mutable_char_buffer),
-        ip::homa::endpoint(ip::homa::v6(), 0), in_flags, 0, 0);
-    socket1.send_to(buffer(const_char_buffer),
-        ip::homa::endpoint(ip::homa::v4(), 0), in_flags, 0, 0);
-    socket1.send_to(buffer(const_char_buffer),
-        ip::homa::endpoint(ip::homa::v6(), 0), in_flags, 0, 0);
-    socket1.send_to(null_buffers(),
-        ip::homa::endpoint(ip::homa::v4(), 0), in_flags, 0, 0);
-    socket1.send_to(null_buffers(),
-        ip::homa::endpoint(ip::homa::v6(), 0), in_flags, 0, 0);
-    socket1.send_to(buffer(mutable_char_buffer),
-        ip::homa::endpoint(ip::homa::v4(), 0), in_flags, 0, 0, ec);
-    socket1.send_to(buffer(mutable_char_buffer),
-        ip::homa::endpoint(ip::homa::v6(), 0), in_flags, 0, 0, ec);
-    socket1.send_to(buffer(const_char_buffer),
-        ip::homa::endpoint(ip::homa::v4(), 0), in_flags, 0, 0, ec);
-    socket1.send_to(buffer(const_char_buffer),
-        ip::homa::endpoint(ip::homa::v6(), 0), in_flags, 0, 0, ec);
-    socket1.send_to(null_buffers(),
-        ip::homa::endpoint(ip::homa::v4(), 0), in_flags, 0, 0, ec);
-    socket1.send_to(null_buffers(),
-        ip::homa::endpoint(ip::homa::v6(), 0), in_flags, 0, 0, ec);
+    // socket1.send_request_to(buffer(mutable_char_buffer),
+    //                 ip::homa::endpoint(ip::homa::v4(), 0), 0, 0);
+    // socket1.send_to(buffer(mutable_char_buffer),
+    //     ip::homa::endpoint(ip::homa::v6(), 0), 0, 0);
+    // socket1.send_to(buffer(const_char_buffer),
+    //     ip::homa::endpoint(ip::homa::v4(), 0), 0, 0);
+    // socket1.send_to(buffer(const_char_buffer),
+    //     ip::homa::endpoint(ip::homa::v6(), 0), 0, 0);
+    // socket1.send_to(null_buffers(),
+    //     ip::homa::endpoint(ip::homa::v4(), 0), 0, 0);
+    // socket1.send_to(null_buffers(),
+    //     ip::homa::endpoint(ip::homa::v6(), 0), 0, 0);
+    // socket1.send_to(buffer(mutable_char_buffer),
+    //     ip::homa::endpoint(ip::homa::v4(), 0), in_flags, 0, 0);
+    // socket1.send_to(buffer(mutable_char_buffer),
+    //     ip::homa::endpoint(ip::homa::v6(), 0), in_flags, 0, 0);
+    // socket1.send_to(buffer(const_char_buffer),
+    //     ip::homa::endpoint(ip::homa::v4(), 0), in_flags, 0, 0);
+    // socket1.send_to(buffer(const_char_buffer),
+    //     ip::homa::endpoint(ip::homa::v6(), 0), in_flags, 0, 0);
+    // socket1.send_to(null_buffers(),
+    //     ip::homa::endpoint(ip::homa::v4(), 0), in_flags, 0, 0);
+    // socket1.send_to(null_buffers(),
+    //     ip::homa::endpoint(ip::homa::v6(), 0), in_flags, 0, 0);
+    // socket1.send_to(buffer(mutable_char_buffer),
+    //     ip::homa::endpoint(ip::homa::v4(), 0), in_flags, 0, 0, ec);
+    // socket1.send_to(buffer(mutable_char_buffer),
+    //     ip::homa::endpoint(ip::homa::v6(), 0), in_flags, 0, 0, ec);
+    // socket1.send_to(buffer(const_char_buffer),
+    //     ip::homa::endpoint(ip::homa::v4(), 0), in_flags, 0, 0, ec);
+    // socket1.send_to(buffer(const_char_buffer),
+    //     ip::homa::endpoint(ip::homa::v6(), 0), in_flags, 0, 0, ec);
+    // socket1.send_to(null_buffers(),
+    //     ip::homa::endpoint(ip::homa::v4(), 0), in_flags, 0, 0, ec);
+    // socket1.send_to(null_buffers(),
+    //     ip::homa::endpoint(ip::homa::v6(), 0), in_flags, 0, 0, ec);
 
     // socket1.async_send_to(buffer(mutable_char_buffer),
     //     ip::homa::endpoint(ip::homa::v4(), 0), send_handler());
@@ -522,6 +522,8 @@ void test()
 #define HOMA_BPAGE_SIZE (1 << HOMA_BPAGE_SHIFT)
 
     const int buf_size = 1000*HOMA_BPAGE_SIZE;
+    std::cout << "page size " << HOMA_BPAGE_SIZE << " buf_size " << buf_size
+              << " pages " << buf_size/HOMA_BPAGE_SIZE << std::endl;
     std::unique_ptr<uint8_t, void(*)(uint8_t*)> buffer_region
       (static_cast<uint8_t*>
        ( ::mmap(NULL, buf_size, PROT_READ|PROT_WRITE,
@@ -552,37 +554,44 @@ void test()
   s2.bind(ip::homa::endpoint(ip::homa::v4(), 0));
   std::cout << "sender socket bound to " << s2.local_endpoint() << std::endl;;
   char send_msg[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-  uint64_t id = 0;
-  std::cout << "target endpoint " << target_endpoint << std::endl;
-  s2.send_to(buffer(send_msg, sizeof(send_msg)), target_endpoint, &id, 0);
-  fprintf(stderr, "id from send to is %d\n", (int)id);
+  char response_msg[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  request_id send_request_id;
+  uint64_t send_completion_cookie = 111;
+  s2.send_request_to(buffer(send_msg, (sizeof(send_msg)-1)), target_endpoint, send_request_id, send_completion_cookie);
 
   ip::homa::endpoint sender_endpoint;
-  buffer_offset offset(0, sizeof(send_msg));
-  std::cout << offset.size() << std::endl;
-  size_t bytes_recvd = s1.receive_from(offset,
-                                       sender_endpoint, 0, 0);
+  homa_pages pages;
+  uint64_t completion_cookie = 112;
+  request_id received_request_id;
+  size_t bytes_recvd = s1.receive_request_from(pages, sender_endpoint, received_request_id, completion_cookie);
+  BOOST_ASIO_CHECK(completion_cookie == 0);
+  
+  BOOST_ASIO_CHECK(completion_cookie == 0);
+  BOOST_ASIO_CHECK(bytes_recvd == (sizeof(send_msg)-1));
+  BOOST_ASIO_CHECK(pages.count() == 1);
+  BOOST_ASIO_CHECK(memcmp(send_msg, (buffer1.first + pages.offsets()[0]).data(), (sizeof(send_msg)-1)) == 0);
 
-  std::cerr << "received ";
-  auto data = static_cast<char*>((buffer1.first + offset).data());
-  std::copy(data, data
-            + offset.size(), std::ostream_iterator<char>(std::cerr));
-  std::cerr << std::endl;
+  s1.send_reply_to(buffer(response_msg, (sizeof(response_msg)-1)), sender_endpoint, received_request_id, completion_cookie);
+  BOOST_ASIO_CHECK(completion_cookie == 0);
 
-  BOOST_ASIO_CHECK(bytes_recvd == sizeof(send_msg));
-  BOOST_ASIO_CHECK(memcmp(send_msg, (buffer1.first + offset).data(), sizeof(send_msg)) == 0);
+  bytes_recvd = s2.receive_reply_from(pages, target_endpoint, send_request_id, completion_cookie);
 
+  BOOST_ASIO_CHECK(completion_cookie == send_completion_cookie);
+  BOOST_ASIO_CHECK(bytes_recvd == (sizeof(send_msg)-1));
+  BOOST_ASIO_CHECK(pages.count() == 1);
+  BOOST_ASIO_CHECK(memcmp(response_msg, (buffer2.first + pages.offsets()[0]).data(), (sizeof(response_msg)-2)) == 0);
+  
   // memset(recv_msg, 0, sizeof(recv_msg));
 
   // target_endpoint = sender_endpoint;
-  // s1.async_send_to(buffer(send_msg, sizeof(send_msg)), target_endpoint,
-  //     bindns::bind(handle_send, sizeof(send_msg), _1, _2));
+  // s1.async_send_to(buffer(send_msg, (sizeof(send_msg)-1)), target_endpoint,
+  //     bindns::bind(handle_send, (sizeof(send_msg)-1), _1, _2));
   // s2.async_receive_from(buffer(recv_msg, sizeof(recv_msg)), sender_endpoint,
   //     bindns::bind(handle_recv, sizeof(recv_msg), _1, _2));
 
   // ioc.run();
 
-  // BOOST_ASIO_CHECK(memcmp(send_msg, recv_msg, sizeof(send_msg)) == 0);
+  // BOOST_ASIO_CHECK(memcmp(send_msg, recv_msg, (sizeof(send_msg)-1)) == 0);
 }
 
 } // namespace ip_homa_socket_runtime
