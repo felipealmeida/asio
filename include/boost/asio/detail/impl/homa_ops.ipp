@@ -51,6 +51,20 @@ namespace asio {
 namespace detail {
 namespace homa_ops {
 
+struct homa_recvmsg_args {
+  uint64_t id;
+  uint64_t completion_cookie;
+  int flags;
+  sockaddr_in6 peer_addr;
+  uint32_t num_bpages;
+  uint32_t _pad[1];
+  uint32_t bpage_offsets[homa_max_bpages];
+};
+static_assert(sizeof(struct homa_recvmsg_args) >= 120,
+		"homa_recvmsg_args shrunk");
+static_assert(sizeof(struct homa_recvmsg_args) <= 120,
+		"homa_recvmsg_args grew");
+
 void set_buffer(socket_type s, void* data, size_t length, boost::system::error_code& ec) {
     struct homa_set_buf_args {
       void *start;
@@ -64,81 +78,47 @@ void set_buffer(socket_type s, void* data, size_t length, boost::system::error_c
     socket_ops::get_last_error(ec, status < 0);
 }
 
-signed_size_type recvfrom(socket_type s, homa_pages& pages,
-                               int flags, void* addr, std::size_t* addrlen,
-                               uint64_t& id, std::uint64_t& completion_cookie,
-                               int homa_flags, boost::system::error_code& ec)
+signed_size_type release_pages(socket_type s, homa_pages const& pages,
+                               int flags, int homa_flags, boost::system::error_code& ec,
+                               const void* addr, int addrlen)
 {
-struct homa_recvmsg_args {
+  homa_recvmsg_args args;
+  args.num_bpages = pages.count();
 
-	/**
-	 * @id: (in/out) Initially specifies the id of the desired RPC, or 0
-	 * if any RPC is OK; returns the actual id received.
-	 */
-	uint64_t id;
+  if (args.num_bpages) {
+    std::memcpy(args.bpage_offsets, pages.offsets(), pages.count()*sizeof(args.bpage_offsets[0]));
+    args.flags = homa_flags;
 
-	/**
-	 * @completion_cookie: (out) If the incoming message is a response,
-	 * this will return the completion cookie specified when the
-	 * request was sent. For requests this will always be zero.
-	 */
-	uint64_t completion_cookie;
+    //fprintf(stderr, "%d %d\n", (int)args.num_bpages, (int)args.bpage_offsets[0]);
+    
+    msghdr msg = msghdr();
+    socket_ops::init_msghdr_msg_name(msg.msg_name, addr);
+    msg.msg_namelen = static_cast<int>(addrlen);
+    msg.msg_control = &args;
+    msg.msg_controllen = sizeof(args);
+    signed_size_type result = ::recvmsg(s, &msg, flags);
+    socket_ops::get_last_error(ec, result < 0);
+    return result;
+  }
+  else
+  {
+    return 0;
+  }
+}
 
-	/**
-	 * @flags: (in) OR-ed combination of bits that control the operation.
-	 * See below for values.
-	 */
-	int flags;
-
-	/**
-	 * @error_addr: the address of the peer is stored here when available.
-	 * This field is different from the msg_name field in struct msghdr
-	 * in that the msg_name field isn't set after errors. This field will
-	 * always be set when peer information is available, which includes
-	 * some error cases.
-	 */
-	sockaddr_in6 peer_addr;
-
-	/**
-	 * @num_bpages: (in/out) Number of valid entries in @bpage_offsets.
-	 * Passes in bpages from previous messages that can now be
-	 * recycled; returns bpages from the new message.
-	 */
-	uint32_t num_bpages;
-
-	uint32_t _pad[1];
-
-	/**
-	 * @bpage_offsets: (in/out) Each entry is an offset into the buffer
-	 * region for the socket pool. When returned from recvmsg, the
-	 * offsets indicate where fragments of the new message are stored. All
-	 * entries but the last refer to full buffer pages (HOMA_BPAGE_SIZE bytes)
-	 * and are bpage-aligned. The last entry may refer to a bpage fragment and
-	 * is not necessarily aligned. The application now owns these bpages and
-	 * must eventually return them to Homa, using bpage_offsets in a future
-	 * recvmsg invocation.
-	 */
-#define HOMA_MAX_MESSAGE_LENGTH 1000000
-#define HOMA_BPAGE_SHIFT 16
-#define HOMA_BPAGE_SIZE (1 << HOMA_BPAGE_SHIFT)
-#define HOMA_MAX_BPAGES ((HOMA_MAX_MESSAGE_LENGTH + HOMA_BPAGE_SIZE - 1) \
-		>> HOMA_BPAGE_SHIFT)
-  uint32_t bpage_offsets[HOMA_MAX_BPAGES];
-} args;
-static_assert(sizeof(struct homa_recvmsg_args) >= 120,
-		"homa_recvmsg_args shrunk");
-static_assert(sizeof(struct homa_recvmsg_args) <= 120,
-		"homa_recvmsg_args grew");
- std::memset(&args, 0, sizeof(args));
- args.id = id;
- args.flags = homa_flags;
- args.completion_cookie = 100;
+signed_size_type recvfrom(socket_type s, homa_pages& pages,
+                          int flags, void* addr, std::size_t* addrlen,
+                          uint64_t& id, std::uint64_t& completion_cookie,
+                          int homa_flags, boost::system::error_code& ec)
+{
+  homa_recvmsg_args args;
+  std::memset(&args, 0, sizeof(args));
+  args.id = id;
+  args.flags = homa_flags;
 
   msghdr msg = msghdr();
   socket_ops::init_msghdr_msg_name(msg.msg_name, addr);
   msg.msg_namelen = static_cast<int>(*addrlen);
-  msg.msg_iov = /*bufs*/ nullptr;
-  msg.msg_iovlen = /*static_cast<int>(count)*/ 0;
   msg.msg_control = &args;
   msg.msg_controllen = sizeof(args);
   signed_size_type result = ::recvmsg(s, &msg, flags);
@@ -191,6 +171,7 @@ signed_size_type sendto(socket_type s, const socket_ops::buf* bufs,
                            , uint64_t& id, uint64_t completion_cookie
                            , boost::system::error_code& ec)
 {
+  fprintf(stderr, "sendto %d %d\n", (int)id, (int)completion_cookie);
   struct homa_sendmsg_args {
     uint64_t id;
     uint64_t completion_cookie;
@@ -241,6 +222,40 @@ size_t sync_sendto(socket_type s, socket_ops::state_type state,
     // Wait for socket to become ready.
     if (socket_ops::poll_write(s, 0, -1, ec) < 0)
       return 0;
+  }
+}
+
+bool non_blocking_send_request_to(socket_type s,
+                                  const socket_ops::buf* bufs, size_t count, int flags,
+                                  const void* addr, std::size_t addrlen,
+                                  std::uint64_t& id, std::uint64_t completion_cookie,
+    boost::system::error_code& ec, size_t& bytes_transferred)
+{
+  for (;;)
+  {
+    // Write some data.
+    signed_size_type bytes = homa_ops::sendto(
+                                              s, bufs, count, flags, addr, addrlen, id, completion_cookie, ec);
+
+    // Check if operation succeeded.
+    if (bytes >= 0)
+    {
+      bytes_transferred = bytes;
+      return true;
+    }
+
+    // Retry operation if interrupted by signal.
+    if (ec == boost::asio::error::interrupted)
+      continue;
+
+    // Check if we need to run the operation again.
+    if (ec == boost::asio::error::would_block
+        || ec == boost::asio::error::try_again)
+      return false;
+
+    // Operation failed.
+    bytes_transferred = 0;
+    return true;
   }
 }
 

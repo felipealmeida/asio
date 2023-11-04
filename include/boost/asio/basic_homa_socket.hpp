@@ -75,10 +75,10 @@ class basic_homa_socket
   : public basic_socket<Protocol, Executor>
 {
 private:
-  class initiate_async_send;
-  class initiate_async_send_to;
-  class initiate_async_receive;
-  class initiate_async_receive_from;
+  //class initiate_async_send;
+  class initiate_async_send_request_to;
+  // class initiate_async_receive;
+  // class initiate_async_receive_from;
 
 public:
   /// The type of the executor associated with the object.
@@ -368,6 +368,19 @@ public:
     boost::asio::detail::throw_error(ec, "receive");
   }
 
+  /**
+   *
+   *
+   */
+  void release_pages(homa_pages const& pages,
+                     const endpoint_type& endpoint)
+  {
+    boost::system::error_code ec;
+    this->impl_.get_service().release_pages(this->impl_.get_implementation(), pages, 0,
+                                            detail::homa_ops::homa_recvmsg_nonblocking, ec,
+                                            endpoint);
+    boost::asio::detail::throw_error(ec, "release_pages");
+  }
 
   /// Send some data on a connected socket.
   /**
@@ -506,22 +519,22 @@ public:
    *
    * @li @c cancellation_type::total
    */
-  template <typename ConstBufferSequence,
-      BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
-        std::size_t)) WriteToken = default_completion_token_t<executor_type>>
-  auto async_send(const ConstBufferSequence& buffers,
-      WriteToken&& token = default_completion_token_t<executor_type>())
-    -> decltype(
-      async_initiate<WriteToken,
-        void (boost::system::error_code, std::size_t)>(
-          declval<initiate_async_send>(), token,
-          buffers, socket_base::message_flags(0)))
-  {
-    return async_initiate<WriteToken,
-      void (boost::system::error_code, std::size_t)>(
-        initiate_async_send(this), token,
-        buffers, socket_base::message_flags(0));
-  }
+  // template <typename ConstBufferSequence,
+  //     BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
+  //       std::size_t)) WriteToken = default_completion_token_t<executor_type>>
+  // auto async_send(const ConstBufferSequence& buffers,
+  //     WriteToken&& token = default_completion_token_t<executor_type>())
+  //   -> decltype(
+  //     async_initiate<WriteToken,
+  //       void (boost::system::error_code, std::size_t)>(
+  //         declval<initiate_async_send>(), token,
+  //         buffers, socket_base::message_flags(0)))
+  // {
+  //   return async_initiate<WriteToken,
+  //     void (boost::system::error_code, std::size_t)>(
+  //       initiate_async_send(this), token,
+  //       buffers, socket_base::message_flags(0));
+  // }
 
   /// Start an asynchronous send on a connected socket.
   /**
@@ -567,21 +580,21 @@ public:
    *
    * @li @c cancellation_type::total
    */
-  template <typename ConstBufferSequence,
-      BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
-        std::size_t)) WriteToken = default_completion_token_t<executor_type>>
-  auto async_send(const ConstBufferSequence& buffers,
-      socket_base::message_flags flags,
-      WriteToken&& token = default_completion_token_t<executor_type>())
-    -> decltype(
-      async_initiate<WriteToken,
-        void (boost::system::error_code, std::size_t)>(
-          declval<initiate_async_send>(), token, buffers, flags))
-  {
-    return async_initiate<WriteToken,
-      void (boost::system::error_code, std::size_t)>(
-        initiate_async_send(this), token, buffers, flags);
-  }
+  // template <typename ConstBufferSequence,
+  //     BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
+  //       std::size_t)) WriteToken = default_completion_token_t<executor_type>>
+  // auto async_send(const ConstBufferSequence& buffers,
+  //     socket_base::message_flags flags,
+  //     WriteToken&& token = default_completion_token_t<executor_type>())
+  //   -> decltype(
+  //     async_initiate<WriteToken,
+  //       void (boost::system::error_code, std::size_t)>(
+  //         declval<initiate_async_send>(), token, buffers, flags))
+  // {
+  //   return async_initiate<WriteToken,
+  //     void (boost::system::error_code, std::size_t)>(
+  //       initiate_async_send(this), token, buffers, flags);
+  // }
 
   /// Send a homa to the specified endpoint.
   /**
@@ -769,23 +782,23 @@ public:
    *
    * @li @c cancellation_type::total
    */
-  template <typename ConstBufferSequence,
-      BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
-        std::size_t)) WriteToken = default_completion_token_t<executor_type>>
-  auto async_send_to(const ConstBufferSequence& buffers,
-      const endpoint_type& destination,
-      WriteToken&& token = default_completion_token_t<executor_type>())
-    -> decltype(
-      async_initiate<WriteToken,
-        void (boost::system::error_code, std::size_t)>(
-          declval<initiate_async_send_to>(), token, buffers,
-          destination, socket_base::message_flags(0)))
-  {
-    return async_initiate<WriteToken,
-      void (boost::system::error_code, std::size_t)>(
-        initiate_async_send_to(this), token, buffers,
-        destination, socket_base::message_flags(0));
-  }
+  // template <typename ConstBufferSequence,
+  //     BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
+  //       std::size_t)) WriteToken = default_completion_token_t<executor_type>>
+  // auto async_send_to(const ConstBufferSequence& buffers,
+  //     const endpoint_type& destination,
+  //     WriteToken&& token = default_completion_token_t<executor_type>())
+  //   -> decltype(
+  //     async_initiate<WriteToken,
+  //       void (boost::system::error_code, std::size_t)>(
+  //         declval<initiate_async_send_to>(), token, buffers,
+  //         destination, socket_base::message_flags(0)))
+  // {
+  //   return async_initiate<WriteToken,
+  //     void (boost::system::error_code, std::size_t)>(
+  //       initiate_async_send_to(this), token, buffers,
+  //       destination, socket_base::message_flags(0));
+  // }
 
   /// Start an asynchronous send.
   /**
@@ -832,19 +845,19 @@ public:
    */
   template <typename ConstBufferSequence,
       BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
-        std::size_t)) WriteToken = default_completion_token_t<executor_type>>
-  auto async_send_to(const ConstBufferSequence& buffers,
+                                            std::size_t, int id)) WriteToken = default_completion_token_t<executor_type>>
+  auto async_send_request_to(const ConstBufferSequence& buffers,
       const endpoint_type& destination, socket_base::message_flags flags,
       WriteToken&& token = default_completion_token_t<executor_type>())
     -> decltype(
       async_initiate<WriteToken,
         void (boost::system::error_code, std::size_t)>(
-          declval<initiate_async_send_to>(), token,
+          declval<initiate_async_send_request_to>(), token,
           buffers, destination, flags))
   {
     return async_initiate<WriteToken,
       void (boost::system::error_code, std::size_t)>(
-        initiate_async_send_to(this), token,
+        initiate_async_send_request_to(this), token,
         buffers, destination, flags);
   }
 
@@ -1247,23 +1260,23 @@ public:
    *
    * @li @c cancellation_type::total
    */
-  template <typename MutableBufferSequence,
-      BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
-        std::size_t)) ReadToken = default_completion_token_t<executor_type>>
-  auto async_receive_from(const MutableBufferSequence& buffers,
-      endpoint_type& sender_endpoint,
-      ReadToken&& token = default_completion_token_t<executor_type>())
-    -> decltype(
-      async_initiate<ReadToken,
-        void (boost::system::error_code, std::size_t)>(
-          declval<initiate_async_receive_from>(), token, buffers,
-          &sender_endpoint, socket_base::message_flags(0)))
-  {
-    return async_initiate<ReadToken,
-      void (boost::system::error_code, std::size_t)>(
-        initiate_async_receive_from(this), token, buffers,
-        &sender_endpoint, socket_base::message_flags(0));
-  }
+  // template <typename MutableBufferSequence,
+  //     BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
+  //       std::size_t)) ReadToken = default_completion_token_t<executor_type>>
+  // auto async_receive_from(const MutableBufferSequence& buffers,
+  //     endpoint_type& sender_endpoint,
+  //     ReadToken&& token = default_completion_token_t<executor_type>())
+  //   -> decltype(
+  //     async_initiate<ReadToken,
+  //       void (boost::system::error_code, std::size_t)>(
+  //         declval<initiate_async_receive_from>(), token, buffers,
+  //         &sender_endpoint, socket_base::message_flags(0)))
+  // {
+  //   return async_initiate<ReadToken,
+  //     void (boost::system::error_code, std::size_t)>(
+  //       initiate_async_receive_from(this), token, buffers,
+  //       &sender_endpoint, socket_base::message_flags(0));
+  // }
 
   /// Start an asynchronous receive.
   /**
@@ -1310,23 +1323,23 @@ public:
    *
    * @li @c cancellation_type::total
    */
-  template <typename MutableBufferSequence,
-      BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
-        std::size_t)) ReadToken = default_completion_token_t<executor_type>>
-  auto async_receive_from(const MutableBufferSequence& buffers,
-      endpoint_type& sender_endpoint, socket_base::message_flags flags,
-      ReadToken&& token = default_completion_token_t<executor_type>())
-    -> decltype(
-      async_initiate<ReadToken,
-        void (boost::system::error_code, std::size_t)>(
-          declval<initiate_async_receive_from>(), token,
-          buffers, &sender_endpoint, flags))
-  {
-    return async_initiate<ReadToken,
-      void (boost::system::error_code, std::size_t)>(
-        initiate_async_receive_from(this), token,
-        buffers, &sender_endpoint, flags);
-  }
+  // template <typename MutableBufferSequence,
+  //     BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
+  //       std::size_t)) ReadToken = default_completion_token_t<executor_type>>
+  // auto async_receive_from(const MutableBufferSequence& buffers,
+  //     endpoint_type& sender_endpoint, socket_base::message_flags flags,
+  //     ReadToken&& token = default_completion_token_t<executor_type>())
+  //   -> decltype(
+  //     async_initiate<ReadToken,
+  //       void (boost::system::error_code, std::size_t)>(
+  //         declval<initiate_async_receive_from>(), token,
+  //         buffers, &sender_endpoint, flags))
+  // {
+  //   return async_initiate<ReadToken,
+  //     void (boost::system::error_code, std::size_t)>(
+  //       initiate_async_receive_from(this), token,
+  //       buffers, &sender_endpoint, flags);
+  // }
 
 private:
   // Disallow copying and assignment.
@@ -1334,46 +1347,46 @@ private:
   basic_homa_socket& operator=(
       const basic_homa_socket&) = delete;
 
-  class initiate_async_send
-  { 
-  public:
-    typedef Executor executor_type;
+  // class initiate_async_send
+  // { 
+  // public:
+  //   typedef Executor executor_type;
 
-    explicit initiate_async_send(basic_homa_socket* self)
-      : self_(self)
-    {
-    }
+  //   explicit initiate_async_send(basic_homa_socket* self)
+  //     : self_(self)
+  //   {
+  //   }
 
-    const executor_type& get_executor() const noexcept
-    {
-      return self_->get_executor();
-    }
+  //   const executor_type& get_executor() const noexcept
+  //   {
+  //     return self_->get_executor();
+  //   }
 
-    template <typename WriteHandler, typename ConstBufferSequence>
-    void operator()(WriteHandler&& handler,
-        const ConstBufferSequence& buffers,
-        socket_base::message_flags flags) const
-    {
-      // If you get an error on the following line it means that your handler
-      // does not meet the documented type requirements for a WriteHandler.
-      BOOST_ASIO_WRITE_HANDLER_CHECK(WriteHandler, handler) type_check;
+  //   template <typename WriteHandler, typename ConstBufferSequence>
+  //   void operator()(WriteHandler&& handler,
+  //       const ConstBufferSequence& buffers,
+  //       socket_base::message_flags flags) const
+  //   {
+  //     // If you get an error on the following line it means that your handler
+  //     // does not meet the documented type requirements for a WriteHandler.
+  //     BOOST_ASIO_WRITE_HANDLER_CHECK(WriteHandler, handler) type_check;
 
-      detail::non_const_lvalue<WriteHandler> handler2(handler);
-      self_->impl_.get_service().async_send(
-          self_->impl_.get_implementation(), buffers, flags,
-          handler2.value, self_->impl_.get_executor());
-    }
+  //     detail::non_const_lvalue<WriteHandler> handler2(handler);
+  //     self_->impl_.get_service().async_send(
+  //         self_->impl_.get_implementation(), buffers, flags,
+  //         handler2.value, self_->impl_.get_executor());
+  //   }
 
-  private:
-    basic_homa_socket* self_;
-  };
+  // private:
+  //   basic_homa_socket* self_;
+  // };
 
-  class initiate_async_send_to
+  class initiate_async_send_request_to
   {
   public:
     typedef Executor executor_type;
 
-    explicit initiate_async_send_to(basic_homa_socket* self)
+    explicit initiate_async_send_request_to(basic_homa_socket* self)
       : self_(self)
     {
     }
@@ -1388,12 +1401,13 @@ private:
         const ConstBufferSequence& buffers, const endpoint_type& destination,
         socket_base::message_flags flags) const
     {
+      fprintf(stderr, "initiate_async_send_request_to\n");
       // If you get an error on the following line it means that your handler
       // does not meet the documented type requirements for a WriteHandler.
-      BOOST_ASIO_WRITE_HANDLER_CHECK(WriteHandler, handler) type_check;
+      //BOOST_ASIO_WRITE_HANDLER_CHECK(WriteHandler, handler) type_check;
 
       detail::non_const_lvalue<WriteHandler> handler2(handler);
-      self_->impl_.get_service().async_send_to(
+      self_->impl_.get_service().async_send_request_to(
           self_->impl_.get_implementation(), buffers, destination,
           flags, handler2.value, self_->impl_.get_executor());
     }

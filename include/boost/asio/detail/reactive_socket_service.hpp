@@ -33,6 +33,7 @@
 #include <boost/asio/detail/reactive_socket_recvfrom_op.hpp>
 #include <boost/asio/detail/reactive_socket_sendto_op.hpp>
 #include <boost/asio/detail/reactive_socket_service_base.hpp>
+#include <boost/asio/detail/reactive_socket_send_request_to_op.hpp>
 #include <boost/asio/detail/reactor.hpp>
 #include <boost/asio/detail/reactor_op.hpp>
 #include <boost/asio/detail/socket_holder.hpp>
@@ -145,6 +146,14 @@ public:
     homa_ops::set_buffer(impl.socket_,
                                                 bufs_type::first(buffers).data(), bufs_type::first(buffers).size(), ec);
     boost::asio::detail::throw_error(ec, "set_buffers");
+  }
+
+  void release_pages(implementation_type& impl, homa_pages const& pages,
+                     socket_base::message_flags flags, int homa_flags,
+                     boost::system::error_code& ec,
+                     const endpoint_type& endpoint)
+  {
+    homa_ops::release_pages(impl.socket_, pages, flags, homa_flags, ec, endpoint.data(), endpoint.size());
   }
 
   // Assign a native socket to a socket implementation.
@@ -301,11 +310,12 @@ public:
   // Start an asynchronous send. The data being sent must be valid for the
   // lifetime of the asynchronous operation.
   template <typename ConstBufferSequence, typename Handler, typename IoExecutor>
-  void async_send_to(implementation_type& impl,
+  void async_send_request_to(implementation_type& impl,
       const ConstBufferSequence& buffers,
       const endpoint_type& destination, socket_base::message_flags flags,
       Handler& handler, const IoExecutor& io_ex)
   {
+    fprintf(stderr, "reactive sendto\n");
     bool is_continuation =
       boost_asio_handler_cont_helpers::is_continuation(handler);
 
@@ -313,7 +323,7 @@ public:
       = boost::asio::get_associated_cancellation_slot(handler);
 
     // Allocate and construct an operation to wrap the handler.
-    typedef reactive_socket_sendto_op<ConstBufferSequence,
+    typedef reactive_socket_send_request_to_op<ConstBufferSequence,
         endpoint_type, Handler, IoExecutor> op;
     typename op::ptr p = { boost::asio::detail::addressof(handler),
       op::ptr::allocate(handler), 0 };
@@ -329,46 +339,46 @@ public:
     }
 
     BOOST_ASIO_HANDLER_CREATION((reactor_.context(), *p.p, "socket",
-          &impl, impl.socket_, "async_send_to"));
+          &impl, impl.socket_, "async_send_request_to"));
 
     start_op(impl, reactor::write_op, p.p,
         is_continuation, true, false, &io_ex, 0);
     p.v = p.p = 0;
   }
 
-  // Start an asynchronous wait until data can be sent without blocking.
-  template <typename Handler, typename IoExecutor>
-  void async_send_to(implementation_type& impl, const null_buffers&,
-      const endpoint_type&, socket_base::message_flags,
-      Handler& handler, const IoExecutor& io_ex)
-  {
-    bool is_continuation =
-      boost_asio_handler_cont_helpers::is_continuation(handler);
+  // // Start an asynchronous wait until data can be sent without blocking.
+  // template <typename Handler, typename IoExecutor>
+  // void async_send_to(implementation_type& impl, const null_buffers&,
+  //     const endpoint_type&, socket_base::message_flags,
+  //     Handler& handler, const IoExecutor& io_ex)
+  // {
+  //   bool is_continuation =
+  //     boost_asio_handler_cont_helpers::is_continuation(handler);
 
-    associated_cancellation_slot_t<Handler> slot
-      = boost::asio::get_associated_cancellation_slot(handler);
+  //   associated_cancellation_slot_t<Handler> slot
+  //     = boost::asio::get_associated_cancellation_slot(handler);
 
-    // Allocate and construct an operation to wrap the handler.
-    typedef reactive_null_buffers_op<Handler, IoExecutor> op;
-    typename op::ptr p = { boost::asio::detail::addressof(handler),
-      op::ptr::allocate(handler), 0 };
-    p.p = new (p.v) op(success_ec_, handler, io_ex);
+  //   // Allocate and construct an operation to wrap the handler.
+  //   typedef reactive_null_buffers_op<Handler, IoExecutor> op;
+  //   typename op::ptr p = { boost::asio::detail::addressof(handler),
+  //     op::ptr::allocate(handler), 0 };
+  //   p.p = new (p.v) op(success_ec_, handler, io_ex);
 
-    // Optionally register for per-operation cancellation.
-    if (slot.is_connected())
-    {
-      p.p->cancellation_key_ =
-        &slot.template emplace<reactor_op_cancellation>(
-            &reactor_, &impl.reactor_data_, impl.socket_, reactor::write_op);
-    }
+  //   // Optionally register for per-operation cancellation.
+  //   if (slot.is_connected())
+  //   {
+  //     p.p->cancellation_key_ =
+  //       &slot.template emplace<reactor_op_cancellation>(
+  //           &reactor_, &impl.reactor_data_, impl.socket_, reactor::write_op);
+  //   }
 
-    BOOST_ASIO_HANDLER_CREATION((reactor_.context(), *p.p, "socket",
-          &impl, impl.socket_, "async_send_to(null_buffers)"));
+  //   BOOST_ASIO_HANDLER_CREATION((reactor_.context(), *p.p, "socket",
+  //         &impl, impl.socket_, "async_send_to(null_buffers)"));
 
-    start_op(impl, reactor::write_op, p.p,
-        is_continuation, false, false, &io_ex, 0);
-    p.v = p.p = 0;
-  }
+  //   start_op(impl, reactor::write_op, p.p,
+  //       is_continuation, false, false, &io_ex, 0);
+  //   p.v = p.p = 0;
+  // }
 
   // Receive a datagram with the endpoint of the sender. Returns the number of
   // bytes received.
