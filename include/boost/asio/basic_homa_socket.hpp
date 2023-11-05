@@ -78,7 +78,7 @@ private:
   //class initiate_async_send;
   class initiate_async_send_request_to;
   // class initiate_async_receive;
-  // class initiate_async_receive_from;
+  class initiate_async_receive_request_from;
 
 public:
   /// The type of the executor associated with the object.
@@ -1260,23 +1260,23 @@ public:
    *
    * @li @c cancellation_type::total
    */
-  // template <typename MutableBufferSequence,
-  //     BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
-  //       std::size_t)) ReadToken = default_completion_token_t<executor_type>>
-  // auto async_receive_from(const MutableBufferSequence& buffers,
-  //     endpoint_type& sender_endpoint,
-  //     ReadToken&& token = default_completion_token_t<executor_type>())
-  //   -> decltype(
-  //     async_initiate<ReadToken,
-  //       void (boost::system::error_code, std::size_t)>(
-  //         declval<initiate_async_receive_from>(), token, buffers,
-  //         &sender_endpoint, socket_base::message_flags(0)))
-  // {
-  //   return async_initiate<ReadToken,
-  //     void (boost::system::error_code, std::size_t)>(
-  //       initiate_async_receive_from(this), token, buffers,
-  //       &sender_endpoint, socket_base::message_flags(0));
-  // }
+  template <
+      BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
+                                            std::size_t, homa_pages, std::uint64_t)) ReadToken = default_completion_token_t<executor_type>>
+  auto async_receive_request_from(
+      endpoint_type& sender_endpoint,
+      ReadToken&& token = default_completion_token_t<executor_type>())
+    -> decltype(
+      async_initiate<ReadToken,
+        void (boost::system::error_code, std::size_t)>(
+          declval<initiate_async_receive_request_from>(), token,
+          &sender_endpoint, socket_base::message_flags(0)))
+  {
+    return async_initiate<ReadToken,
+      void (boost::system::error_code, std::size_t)>(
+        initiate_async_receive_request_from(this), token,
+        &sender_endpoint, socket_base::message_flags(0));
+  }
 
   /// Start an asynchronous receive.
   /**
@@ -1416,12 +1416,45 @@ private:
     basic_homa_socket* self_;
   };
 
-  class initiate_async_receive
+  // class initiate_async_receive
+  // {
+  // public:
+  //   typedef Executor executor_type;
+
+  //   explicit initiate_async_receive(basic_homa_socket* self)
+  //     : self_(self)
+  //   {
+  //   }
+
+  //   const executor_type& get_executor() const noexcept
+  //   {
+  //     return self_->get_executor();
+  //   }
+
+  //   template <typename ReadHandler, typename MutableBufferSequence>
+  //   void operator()(ReadHandler&& handler,
+  //       socket_base::message_flags flags) const
+  //   {
+  //     // If you get an error on the following line it means that your handler
+  //     // does not meet the documented type requirements for a ReadHandler.
+  //     //BOOST_ASIO_READ_HANDLER_CHECK(ReadHandler, handler) type_check;
+
+  //     detail::non_const_lvalue<ReadHandler> handler2(handler);
+  //     self_->impl_.get_service().async_receive(
+  //         self_->impl_.get_implementation(), flags,
+  //         handler2.value, self_->impl_.get_executor());
+  //   }
+
+  // private:
+  //   basic_homa_socket* self_;
+  // };
+
+  class initiate_async_receive_request_from
   {
   public:
     typedef Executor executor_type;
 
-    explicit initiate_async_receive(basic_homa_socket* self)
+    explicit initiate_async_receive_request_from(basic_homa_socket* self)
       : self_(self)
     {
     }
@@ -1431,52 +1464,18 @@ private:
       return self_->get_executor();
     }
 
-    template <typename ReadHandler, typename MutableBufferSequence>
+    template <typename ReadHandler>
     void operator()(ReadHandler&& handler,
-        const MutableBufferSequence& buffers,
+                    endpoint_type* sender_endpoint,
         socket_base::message_flags flags) const
     {
       // If you get an error on the following line it means that your handler
       // does not meet the documented type requirements for a ReadHandler.
-      BOOST_ASIO_READ_HANDLER_CHECK(ReadHandler, handler) type_check;
+      //BOOST_ASIO_READ_HANDLER_CHECK(ReadHandler, handler) type_check;
 
       detail::non_const_lvalue<ReadHandler> handler2(handler);
-      self_->impl_.get_service().async_receive(
-          self_->impl_.get_implementation(), buffers, flags,
-          handler2.value, self_->impl_.get_executor());
-    }
-
-  private:
-    basic_homa_socket* self_;
-  };
-
-  class initiate_async_receive_from
-  {
-  public:
-    typedef Executor executor_type;
-
-    explicit initiate_async_receive_from(basic_homa_socket* self)
-      : self_(self)
-    {
-    }
-
-    const executor_type& get_executor() const noexcept
-    {
-      return self_->get_executor();
-    }
-
-    template <typename ReadHandler, typename MutableBufferSequence>
-    void operator()(ReadHandler&& handler,
-        const MutableBufferSequence& buffers, endpoint_type* sender_endpoint,
-        socket_base::message_flags flags) const
-    {
-      // If you get an error on the following line it means that your handler
-      // does not meet the documented type requirements for a ReadHandler.
-      BOOST_ASIO_READ_HANDLER_CHECK(ReadHandler, handler) type_check;
-
-      detail::non_const_lvalue<ReadHandler> handler2(handler);
-      self_->impl_.get_service().async_receive_from(
-          self_->impl_.get_implementation(), buffers, *sender_endpoint,
+      self_->impl_.get_service().async_receive_request_from(
+          self_->impl_.get_implementation(), *sender_endpoint,
           flags, handler2.value, self_->impl_.get_executor());
     }
 

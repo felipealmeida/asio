@@ -494,15 +494,19 @@ void handle_send_request(size_t expected_bytes_sent,
 {
   std::cout << "err " << err << " " << err.message() << std::endl;
   std::cout << "id of request " << id << std::endl;
+  std::cout << "bytes sent " << bytes_sent << " expected " << expected_bytes_sent << std::endl;
   BOOST_ASIO_CHECK(!err);
   BOOST_ASIO_CHECK(expected_bytes_sent == bytes_sent);
 }
 
-void handle_recv(size_t expected_bytes_recvd,
-    const boost::system::error_code& err, size_t bytes_recvd)
+void handle_recv_request(char* send_msg, std::size_t send_msg_size, uint8_t* buffer,
+                         size_t expected_bytes_recvd,
+                         const boost::system::error_code& err, size_t bytes_recvd,
+                         const boost::asio::homa_pages& pages, std::uint64_t id)
 {
   BOOST_ASIO_CHECK(!err);
   BOOST_ASIO_CHECK(expected_bytes_recvd == bytes_recvd);
+  BOOST_ASIO_CHECK(memcmp(send_msg, (buffer + pages.offsets()[0]), send_msg_size) == 0);
 }
 
 void test()
@@ -515,6 +519,7 @@ void test()
   using bindns::placeholders::_1;
   using bindns::placeholders::_2;
   using bindns::placeholders::_3;
+  using bindns::placeholders::_4;
 
   io_context ioc;
 
@@ -592,16 +597,16 @@ void test()
   // memset(recv_msg, 0, sizeof(recv_msg));
 
   fprintf(stderr, "async send\n");
-  char recv_msg[sizeof(send_msg)];
   // target_endpoint = sender_endpoint;
-  s1.async_send_request_to(buffer(send_msg, (sizeof(send_msg)-1)), target_endpoint, 0,
+  s1.async_send_request_to(buffer(send_msg, (sizeof(send_msg)-1)), sender_endpoint, 0,
                            bindns::bind(handle_send_request, (sizeof(send_msg)-1), _1, _2, _3));
-  // s2.async_receive_from(buffer(recv_msg, sizeof(recv_msg)), sender_endpoint,
-  //     bindns::bind(handle_recv, sizeof(recv_msg), _1, _2));
+  fprintf(stderr, "async receive\n");
+  s2.async_receive_request_from(target_endpoint,
+                                bindns::bind(handle_recv_request, send_msg, sizeof(send_msg)-1,
+                                             (std::uint8_t*)buffer2.first.data(),
+                                             sizeof(send_msg)-1, _1, _2, _3, _4));
 
   ioc.run();
-
-  BOOST_ASIO_CHECK(memcmp(send_msg, recv_msg, (sizeof(send_msg)-1)) == 0);
 }
 
 } // namespace ip_homa_socket_runtime
