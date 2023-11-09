@@ -35,6 +35,7 @@
 #include <boost/asio/detail/reactive_socket_service_base.hpp>
 #include <boost/asio/detail/reactive_socket_send_request_to_op.hpp>
 #include <boost/asio/detail/reactive_socket_recv_request_from_op.hpp>
+#include <boost/asio/detail/reactive_socket_recv_request_op.hpp>
 #include <boost/asio/detail/reactor.hpp>
 #include <boost/asio/detail/reactor_op.hpp>
 #include <boost/asio/detail/socket_holder.hpp>
@@ -347,6 +348,45 @@ public:
     p.v = p.p = 0;
   }
 
+  // Start an asynchronous send. The data being sent must be valid for the
+  // lifetime of the asynchronous operation.
+  template <typename ConstBufferSequence, typename Handler, typename IoExecutor>
+  void async_send_reply_to(implementation_type& impl,
+      const ConstBufferSequence& buffers,
+      const endpoint_type& destination, socket_base::message_flags flags,
+      Handler& handler, const IoExecutor& io_ex)
+  {
+    fprintf(stderr, "reactive sendto\n");
+    bool is_continuation =
+      boost_asio_handler_cont_helpers::is_continuation(handler);
+
+    associated_cancellation_slot_t<Handler> slot
+      = boost::asio::get_associated_cancellation_slot(handler);
+
+    // Allocate and construct an operation to wrap the handler.
+    typedef reactive_socket_send_request_to_op<ConstBufferSequence,
+        endpoint_type, Handler, IoExecutor> op;
+    typename op::ptr p = { boost::asio::detail::addressof(handler),
+      op::ptr::allocate(handler), 0 };
+    p.p = new (p.v) op(success_ec_, impl.socket_,
+        buffers, destination, flags, handler, io_ex);
+
+    // Optionally register for per-operation cancellation.
+    if (slot.is_connected())
+    {
+      p.p->cancellation_key_ =
+        &slot.template emplace<reactor_op_cancellation>(
+            &reactor_, &impl.reactor_data_, impl.socket_, reactor::write_op);
+    }
+
+    BOOST_ASIO_HANDLER_CREATION((reactor_.context(), *p.p, "socket",
+          &impl, impl.socket_, "async_send_request_to"));
+
+    start_op(impl, reactor::write_op, p.p,
+        is_continuation, true, false, &io_ex, 0);
+    p.v = p.p = 0;
+  }
+
   // // Start an asynchronous wait until data can be sent without blocking.
   // template <typename Handler, typename IoExecutor>
   // void async_send_to(implementation_type& impl, const null_buffers&,
@@ -453,6 +493,48 @@ public:
 
     BOOST_ASIO_HANDLER_CREATION((reactor_.context(), *p.p, "socket",
           &impl, impl.socket_, "async_receive_from"));
+
+    start_op(impl,
+        (flags & socket_base::message_out_of_band)
+          ? reactor::except_op : reactor::read_op,
+        p.p, is_continuation, true, false, &io_ex, 0);
+    p.v = p.p = 0;
+  }
+
+  // Start an asynchronous receive. The buffer for the data being received and
+  // the sender_endpoint object must both be valid for the lifetime of the
+  // asynchronous operation.
+  template <
+      typename Handler, typename IoExecutor>
+  void async_receive_request(implementation_type& impl,
+      socket_base::message_flags flags, Handler& handler,
+      const IoExecutor& io_ex)
+  {
+    bool is_continuation =
+      boost_asio_handler_cont_helpers::is_continuation(handler);
+
+    associated_cancellation_slot_t<Handler> slot
+      = boost::asio::get_associated_cancellation_slot(handler);
+
+    // Allocate and construct an operation to wrap the handler.
+    typedef reactive_socket_recv_request_op<
+        Handler, IoExecutor> op;
+    typename op::ptr p = { boost::asio::detail::addressof(handler),
+      op::ptr::allocate(handler), 0 };
+    int protocol = impl.protocol_.type();
+    p.p = new (p.v) op(success_ec_, impl.socket_, protocol,
+        flags, handler, io_ex);
+
+    // Optionally register for per-operation cancellation.
+    if (slot.is_connected())
+    {
+      p.p->cancellation_key_ =
+        &slot.template emplace<reactor_op_cancellation>(
+            &reactor_, &impl.reactor_data_, impl.socket_, reactor::read_op);
+    }
+
+    BOOST_ASIO_HANDLER_CREATION((reactor_.context(), *p.p, "socket",
+          &impl, impl.socket_, "async_receive_request"));
 
     start_op(impl,
         (flags & socket_base::message_out_of_band)

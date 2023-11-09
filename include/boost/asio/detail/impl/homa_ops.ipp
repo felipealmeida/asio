@@ -133,6 +133,30 @@ signed_size_type recvfrom(socket_type s, homa_pages& pages,
   return result;
 }
 
+signed_size_type recv(socket_type s, homa_pages& pages,
+                      int flags,
+                      uint64_t& id, std::uint64_t& completion_cookie,
+                      int homa_flags, boost::system::error_code& ec)
+{
+  homa_recvmsg_args args;
+  std::memset(&args, 0, sizeof(args));
+  args.id = id;
+  args.flags = homa_flags;
+
+  msghdr msg = msghdr();
+  msg.msg_control = &args;
+  msg.msg_controllen = sizeof(args);
+  fprintf(stderr, "waiting to read %d %d\n", (int)args.num_bpages, args.bpage_offsets[0]);
+  signed_size_type result = ::recvmsg(s, &msg, flags);
+  fprintf(stderr, "result of recvmsg %d\n", (int)result);
+  fprintf(stderr, "finished reading first offset at %d\n", (int)args.bpage_offsets[0]);
+  pages.copy_from(args.bpage_offsets, args.num_bpages);
+  id = args.id;
+  completion_cookie = args.completion_cookie;
+  socket_ops::get_last_error(ec, result < 0);
+  return result;
+}
+
 size_t sync_recvfrom(socket_type s, socket_ops::state_type state, homa_pages& pages,
                           int flags, void* addr, std::size_t* addrlen, uint64_t& id,
                           uint64_t& completion_cookie, int homa_flags,
@@ -275,6 +299,39 @@ bool non_blocking_recvfrom(socket_type s, homa_pages& pages,
     // Read some data.
     std::uint64_t completion_cookie = 0;
     signed_size_type bytes = homa_ops::recvfrom(s, pages, flags, addr, addrlen, id, completion_cookie, homa_flags, ec);
+
+    // Check if operation succeeded.
+    if (bytes >= 0)
+    {
+      bytes_transferred = bytes;
+      return true;
+    }
+
+    // Retry operation if interrupted by signal.
+    if (ec == boost::asio::error::interrupted)
+      continue;
+
+    // Check if we need to run the operation again.
+    if (ec == boost::asio::error::would_block
+        || ec == boost::asio::error::try_again)
+      return false;
+
+    // Operation failed.
+    bytes_transferred = 0;
+    return true;
+  }
+}
+
+bool non_blocking_recv(socket_type s, homa_pages& pages,
+                       int flags,
+                       boost::system::error_code& ec, size_t& bytes_transferred, std::uint64_t& id,
+                       int homa_flags)
+{
+  for (;;)
+  {
+    // Read some data.
+    std::uint64_t completion_cookie = 0;
+    signed_size_type bytes = homa_ops::recv(s, pages, flags, id, completion_cookie, homa_flags, ec);
 
     // Check if operation succeeded.
     if (bytes >= 0)

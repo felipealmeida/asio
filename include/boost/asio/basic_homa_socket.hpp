@@ -77,7 +77,7 @@ class basic_homa_socket
 private:
   //class initiate_async_send;
   class initiate_async_send_request_to;
-  // class initiate_async_receive;
+  class initiate_async_receive_request;
   class initiate_async_receive_request_from;
 
 public:
@@ -851,12 +851,12 @@ public:
       WriteToken&& token = default_completion_token_t<executor_type>())
     -> decltype(
       async_initiate<WriteToken,
-        void (boost::system::error_code, std::size_t)>(
+      void (boost::system::error_code, std::size_t, int id)>(
           declval<initiate_async_send_request_to>(), token,
           buffers, destination, flags))
   {
     return async_initiate<WriteToken,
-      void (boost::system::error_code, std::size_t)>(
+                          void (boost::system::error_code, std::size_t, int id)>(
         initiate_async_send_request_to(this), token,
         buffers, destination, flags);
   }
@@ -1242,9 +1242,9 @@ public:
    * @code void(boost::system::error_code, std::size_t) @endcode
    *
    * @par Example
-   * To receive into a single data buffer use the @ref buffer function as
+   * To receive request into a single data buffer use the @ref buffer function as
    * follows:
-   * @code socket.async_receive_from(
+   * @code socket.async_receive_request_from(
    *     boost::asio::buffer(data, size), sender_endpoint, handler); @endcode
    * See the @ref buffer documentation for information on receiving into
    * multiple buffers in one go, and how to use it with arrays, boost::array or
@@ -1268,14 +1268,83 @@ public:
       ReadToken&& token = default_completion_token_t<executor_type>())
     -> decltype(
       async_initiate<ReadToken,
-        void (boost::system::error_code, std::size_t)>(
+      void (boost::system::error_code, std::size_t, boost::asio::homa_pages, std::uint64_t)>(
           declval<initiate_async_receive_request_from>(), token,
           &sender_endpoint, socket_base::message_flags(0)))
   {
     return async_initiate<ReadToken,
-      void (boost::system::error_code, std::size_t)>(
+                          void (boost::system::error_code, std::size_t, boost::asio::homa_pages, std::uint64_t)>(
         initiate_async_receive_request_from(this), token,
         &sender_endpoint, socket_base::message_flags(0));
+  }
+
+  /// Start an asynchronous receive.
+  /**
+   * This function is used to asynchronously receive a homa. It is an
+   * initiating function for an @ref asynchronous_operation, and always returns
+   * immediately.
+   *
+   * @param buffers One or more buffers into which the data will be received.
+   * Although the buffers object may be copied as necessary, ownership of the
+   * underlying memory blocks is retained by the caller, which must guarantee
+   * that they remain valid until the completion handler is called.
+   *
+   * @param sender_endpoint An endpoint object that receives the endpoint of
+   * the remote sender of the homa. Ownership of the sender_endpoint object
+   * is retained by the caller, which must guarantee that it is valid until the
+   * completion handler is called.
+   *
+   * @param token The @ref completion_token that will be used to produce a
+   * completion handler, which will be called when the receive completes.
+   * Potential completion tokens include @ref use_future, @ref use_awaitable,
+   * @ref yield_context, or a function object with the correct completion
+   * signature. The function signature of the completion handler must be:
+   * @code void handler(
+   *   const boost::system::error_code& error, // Result of operation.
+   *   std::size_t bytes_transferred // Number of bytes received.
+   * ); @endcode
+   * Regardless of whether the asynchronous operation completes immediately or
+   * not, the completion handler will not be invoked from within this function.
+   * On immediate completion, invocation of the handler will be performed in a
+   * manner equivalent to using boost::asio::post().
+   *
+   * @par Completion Signature
+   * @code void(boost::system::error_code, std::size_t) @endcode
+   *
+   * @par Example
+   * To receive request into a single data buffer use the @ref buffer function as
+   * follows:
+   * @code socket.async_receive_request_from(
+   *     boost::asio::buffer(data, size), sender_endpoint, handler); @endcode
+   * See the @ref buffer documentation for information on receiving into
+   * multiple buffers in one go, and how to use it with arrays, boost::array or
+   * std::vector.
+   *
+   * @par Per-Operation Cancellation
+   * On POSIX or Windows operating systems, this asynchronous operation supports
+   * cancellation for the following boost::asio::cancellation_type values:
+   *
+   * @li @c cancellation_type::terminal
+   *
+   * @li @c cancellation_type::partial
+   *
+   * @li @c cancellation_type::total
+   */
+  template <
+      BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
+                                            std::size_t, homa_pages, std::uint64_t)) ReadToken = default_completion_token_t<executor_type>>
+  auto async_receive_request(
+      ReadToken&& token = default_completion_token_t<executor_type>())
+    -> decltype(
+      async_initiate<ReadToken,
+      void (boost::system::error_code, std::size_t, boost::asio::homa_pages, std::uint64_t)>(
+          declval<initiate_async_receive_request>(), token,
+          socket_base::message_flags(0)))
+  {
+    return async_initiate<ReadToken,
+                          void (boost::system::error_code, std::size_t, boost::asio::homa_pages, std::uint64_t)>(
+        initiate_async_receive_request(this), token,
+        socket_base::message_flags(0));
   }
 
   /// Start an asynchronous receive.
@@ -1416,38 +1485,38 @@ private:
     basic_homa_socket* self_;
   };
 
-  // class initiate_async_receive
-  // {
-  // public:
-  //   typedef Executor executor_type;
+  class initiate_async_receive_request
+  {
+  public:
+    typedef Executor executor_type;
 
-  //   explicit initiate_async_receive(basic_homa_socket* self)
-  //     : self_(self)
-  //   {
-  //   }
+    explicit initiate_async_receive_request(basic_homa_socket* self)
+      : self_(self)
+    {
+    }
 
-  //   const executor_type& get_executor() const noexcept
-  //   {
-  //     return self_->get_executor();
-  //   }
+    const executor_type& get_executor() const noexcept
+    {
+      return self_->get_executor();
+    }
 
-  //   template <typename ReadHandler, typename MutableBufferSequence>
-  //   void operator()(ReadHandler&& handler,
-  //       socket_base::message_flags flags) const
-  //   {
-  //     // If you get an error on the following line it means that your handler
-  //     // does not meet the documented type requirements for a ReadHandler.
-  //     //BOOST_ASIO_READ_HANDLER_CHECK(ReadHandler, handler) type_check;
+    template <typename ReadHandler>
+    void operator()(ReadHandler&& handler,
+        socket_base::message_flags flags) const
+    {
+      // If you get an error on the following line it means that your handler
+      // does not meet the documented type requirements for a ReadHandler.
+      //BOOST_ASIO_READ_HANDLER_CHECK(ReadHandler, handler) type_check;
 
-  //     detail::non_const_lvalue<ReadHandler> handler2(handler);
-  //     self_->impl_.get_service().async_receive(
-  //         self_->impl_.get_implementation(), flags,
-  //         handler2.value, self_->impl_.get_executor());
-  //   }
+      detail::non_const_lvalue<ReadHandler> handler2(handler);
+      self_->impl_.get_service().async_receive_request(
+          self_->impl_.get_implementation(), flags,
+          handler2.value, self_->impl_.get_executor());
+    }
 
-  // private:
-  //   basic_homa_socket* self_;
-  // };
+  private:
+    basic_homa_socket* self_;
+  };
 
   class initiate_async_receive_request_from
   {

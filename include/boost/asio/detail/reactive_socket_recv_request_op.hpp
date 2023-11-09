@@ -1,6 +1,6 @@
 //
-// detail/reactive_socket_send_request_to_op.hpp
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// detail/reactive_socket_recv_request_op.hpp
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
 // Copyright (c) 2003-2023 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
@@ -8,8 +8,8 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 
-#ifndef BOOST_ASIO_DETAIL_REACTIVE_SOCKET_SEND_REQUEST_TO_OP_HPP
-#define BOOST_ASIO_DETAIL_REACTIVE_SOCKET_SEND_REQUEST_TO_OP_HPP
+#ifndef BOOST_ASIO_DETAIL_REACTIVE_SOCKET_RECV_REQUEST_OP_HPP
+#define BOOST_ASIO_DETAIL_REACTIVE_SOCKET_RECV_REQUEST_OP_HPP
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1200)
 # pragma once
@@ -24,7 +24,6 @@
 #include <boost/asio/detail/memory.hpp>
 #include <boost/asio/detail/reactor_op.hpp>
 #include <boost/asio/detail/socket_ops.hpp>
-#include <boost/asio/detail/impl/homa_ops.ipp>
 
 #include <boost/asio/detail/push_options.hpp>
 
@@ -32,20 +31,18 @@ namespace boost {
 namespace asio {
 namespace detail {
 
-template <typename ConstBufferSequence, typename Endpoint>
-class reactive_socket_send_request_to_op_base : public reactor_op
+class reactive_socket_recv_request_op_base : public reactor_op
 {
 public:
-  reactive_socket_send_request_to_op_base(const boost::system::error_code& success_ec,
-      socket_type socket, const ConstBufferSequence& buffers,
-      const Endpoint& endpoint, socket_base::message_flags flags,
-      func_type complete_func)
+  reactive_socket_recv_request_op_base(const boost::system::error_code& success_ec,
+      socket_type socket, int protocol_type,
+      socket_base::message_flags flags, func_type complete_func)
     : reactor_op(success_ec,
-        &reactive_socket_send_request_to_op_base::do_perform, complete_func),
+      &reactive_socket_recv_request_op_base::do_perform, complete_func),
       socket_(socket),
+      protocol_type_(protocol_type),
+      pages_(),
       id_(0),
-      buffers_(buffers),
-      destination_(endpoint),
       flags_(flags)
   {
   }
@@ -53,63 +50,48 @@ public:
   static status do_perform(reactor_op* base)
   {
     BOOST_ASIO_ASSUME(base != 0);
-    reactive_socket_send_request_to_op_base* o(
-        static_cast<reactive_socket_send_request_to_op_base*>(base));
-
-    typedef buffer_sequence_adapter<boost::asio::const_buffer,
-        ConstBufferSequence> bufs_type;
+    reactive_socket_recv_request_op_base* o(
+        static_cast<reactive_socket_recv_request_op_base*>(base));
 
     status result;
-    // if (bufs_type::is_single_buffer)
-    // {
-    //   result = homa_ops::non_blocking_sendto1(o->socket_,
-    //       bufs_type::first(o->buffers_).data(),
-    //       bufs_type::first(o->buffers_).size(), o->flags_,
-    //       o->destination_.data(), o->destination_.size(),
-    //       o->ec_, o->bytes_transferred_) ? done : not_done;
-    // }
-    // else
     {
-      printf("do_perform\n");
-      bufs_type bufs(o->buffers_);
-      result = homa_ops::non_blocking_send_request_to(o->socket_,
-          bufs.buffers(), bufs.count(), o->flags_,
-                                                      o->destination_.data(), o->destination_.size(), o->id_, 0,
-          o->ec_, o->bytes_transferred_) ? done : not_done;
+      result = homa_ops::non_blocking_recv(o->socket_, o->pages_,
+                                               o->flags_,
+          o->ec_, o->bytes_transferred_, o->id_, asio::detail::homa_ops::homa_recvmsg_request) ? done : not_done;
     }
 
-    BOOST_ASIO_HANDLER_REACTOR_OPERATION((*o, "non_blocking_sendto",
-                                          o->ec_, o->bytes_transferred_, o->id_));
+    BOOST_ASIO_HANDLER_REACTOR_OPERATION((*o, "non_blocking_recv_request",
+                                          o->ec_, o->bytes_transferred_, pages, id));
 
     return result;
   }
 
+  homa_pages pages_;
   std::uint64_t id_;
 private:
   socket_type socket_;
-  ConstBufferSequence buffers_;
-  Endpoint destination_;
+  int protocol_type_;
   socket_base::message_flags flags_;
 };
 
-template <typename ConstBufferSequence, typename Endpoint,
+template <
     typename Handler, typename IoExecutor>
-class reactive_socket_send_request_to_op :
-  public reactive_socket_send_request_to_op_base<ConstBufferSequence, Endpoint>
+class reactive_socket_recv_request_op :
+  public reactive_socket_recv_request_op_base
 {
 public:
   typedef Handler handler_type;
   typedef IoExecutor io_executor_type;
 
-  BOOST_ASIO_DEFINE_HANDLER_PTR(reactive_socket_send_request_to_op);
+  BOOST_ASIO_DEFINE_HANDLER_PTR(reactive_socket_recv_request_op);
 
-  reactive_socket_send_request_to_op(const boost::system::error_code& success_ec,
-      socket_type socket, const ConstBufferSequence& buffers,
-      const Endpoint& endpoint, socket_base::message_flags flags,
-      Handler& handler, const IoExecutor& io_ex)
-    : reactive_socket_send_request_to_op_base<ConstBufferSequence, Endpoint>(
-        success_ec, socket, buffers, endpoint, flags,
-        &reactive_socket_send_request_to_op::do_complete),
+  reactive_socket_recv_request_op(const boost::system::error_code& success_ec,
+      socket_type socket, int protocol_type,
+      socket_base::message_flags flags, Handler& handler,
+      const IoExecutor& io_ex)
+    : reactive_socket_recv_request_op_base(
+        success_ec, socket, protocol_type, flags,
+        &reactive_socket_recv_request_op::do_complete),
       handler_(static_cast<Handler&&>(handler)),
       work_(handler_, io_ex)
   {
@@ -117,11 +99,12 @@ public:
 
   static void do_complete(void* owner, operation* base,
       const boost::system::error_code& /*ec*/,
-                          std::size_t /*bytes_transferred*/)
+      std::size_t /*bytes_transferred*/)
   {
     // Take ownership of the handler object.
     BOOST_ASIO_ASSUME(base != 0);
-    reactive_socket_send_request_to_op* o(static_cast<reactive_socket_send_request_to_op*>(base));
+    reactive_socket_recv_request_op* o(
+        static_cast<reactive_socket_recv_request_op*>(base));
     ptr p = { boost::asio::detail::addressof(o->handler_), o, o };
 
     BOOST_ASIO_HANDLER_COMPLETION((*o));
@@ -139,8 +122,8 @@ public:
     // with the handler. Consequently, a local copy of the handler is required
     // to ensure that any owning sub-object remains valid until after we have
     // deallocated the memory here.
-    detail::binder3<Handler, boost::system::error_code, std::size_t, std::uint64_t>
-      handler(o->handler_, o->ec_, o->bytes_transferred_, o->id_);
+    detail::binder4<Handler, boost::system::error_code, std::size_t, homa_pages&, std::uint64_t>
+      handler(o->handler_, o->ec_, o->bytes_transferred_, o->pages_, o->id_);
     p.h = boost::asio::detail::addressof(handler.handler_);
     p.reset();
 
@@ -148,7 +131,7 @@ public:
     if (owner)
     {
       fenced_block b(fenced_block::half);
-      BOOST_ASIO_HANDLER_INVOCATION_BEGIN((handler.arg1_, handler.arg2_, handler.arg3_));
+      BOOST_ASIO_HANDLER_INVOCATION_BEGIN((handler.arg1_, handler.arg2_));
       w.complete(handler, handler.handler_);
       BOOST_ASIO_HANDLER_INVOCATION_END;
     }
@@ -158,7 +141,8 @@ public:
   {
     // Take ownership of the handler object.
     BOOST_ASIO_ASSUME(base != 0);
-    reactive_socket_send_request_to_op* o(static_cast<reactive_socket_send_request_to_op*>(base));
+    reactive_socket_recv_request_op* o(
+        static_cast<reactive_socket_recv_request_op*>(base));
     ptr p = { boost::asio::detail::addressof(o->handler_), o, o };
 
     BOOST_ASIO_HANDLER_COMPLETION((*o));
@@ -197,4 +181,4 @@ private:
 
 #include <boost/asio/detail/pop_options.hpp>
 
-#endif // BOOST_ASIO_DETAIL_REACTIVE_SOCKET_SEND_REQUEST_TO_OP_HPP
+#endif // BOOST_ASIO_DETAIL_REACTIVE_SOCKET_RECV_REQUEST_OP_HPP
